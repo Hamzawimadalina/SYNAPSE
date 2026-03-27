@@ -8,14 +8,13 @@ def creer_tables():
     conn = connexion_db()
     c = conn.cursor()
     c.execute("PRAGMA foreign_keys = OFF")
-    c.execute('DROP TABLE IF EXISTS Erreur')
-    c.execute('DROP TABLE IF EXISTS Resultat')
-    c.execute('DROP TABLE IF EXISTS Exercice_Notion')
-    c.execute('DROP TABLE IF EXISTS Exercice')
+    tables = ['Erreur', 'Resultat', 'Exercice_Notion', 'Exercice', 'Notion', 'Chapitre', 'Session', 'Utilisateur']
+    for table in tables:
+        c.execute(f'DROP TABLE IF EXISTS {table}')
     c.execute("PRAGMA foreign_keys = ON")
 
     c.execute('''
-        CREATE TABLE IF NOT EXISTS Utilisateur(
+        CREATE TABLE Utilisateur(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom TEXT NOT NULL,
             mdp TEXT NOT NULL,
@@ -23,50 +22,45 @@ def creer_tables():
             etablissement TEXT
         )
     ''')
-
     c.execute('''
-        CREATE TABLE IF NOT EXISTS Session(
+        CREATE TABLE Session(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             utilisateur_id INTEGER,
             date TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(utilisateur_id) REFERENCES Utilisateur(id)
         )
     ''')
-
     c.execute('''
-        CREATE TABLE IF NOT EXISTS Chapitre (
+        CREATE TABLE Chapitre (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             matiere TEXT NOT NULL,
             nom TEXT NOT NULL,
-            frequence_bac TEXT   -- "forte", "moyenne", "faible"
+            frequence_bac TEXT
         )
     ''')
-
     c.execute('''
-        CREATE TABLE IF NOT EXISTS Notion (
+        CREATE TABLE Notion (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom TEXT NOT NULL
         )
     ''')
-
     c.execute('''
-        CREATE TABLE IF NOT EXISTS Exercice (
+        CREATE TABLE Exercice (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             id_chapitre INTEGER NOT NULL,
-            type TEXT NOT NULL,          -- "QCM", "trous", "code", "texte"
+            type TEXT NOT NULL,
             question TEXT NOT NULL,
-            options TEXT,                 -- pour les QCM : "opt1;opt2;opt3"
-            reponse_attendue TEXT,        -- la bonne réponse (ou code attendu)
-            contraintes TEXT,              -- pour le code : "print,max,min"
-            nom_fonction TEXT,             -- nom de la fonction à exécuter (pour code)
-            test_input TEXT,                -- paramètres d'appel (ex: "(2,3)")
-            test_output TEXT,               -- résultat attendu (ex: "5")
+            options TEXT,
+            reponse_attendue TEXT,
+            contraintes TEXT,
+            nom_fonction TEXT,
+            test_input TEXT,
+            test_output TEXT,
             FOREIGN KEY (id_chapitre) REFERENCES Chapitre(id) ON DELETE CASCADE
         )
     ''')
-
     c.execute('''
-        CREATE TABLE IF NOT EXISTS Exercice_Notion (
+        CREATE TABLE Exercice_Notion (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             exercice_id INTEGER NOT NULL,
             notion_id INTEGER NOT NULL,
@@ -74,21 +68,19 @@ def creer_tables():
             FOREIGN KEY (notion_id) REFERENCES Notion(id) ON DELETE CASCADE
         )
     ''')
-
     c.execute('''
-        CREATE TABLE IF NOT EXISTS Resultat (
+        CREATE TABLE Resultat (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             utilisateur_id INTEGER NOT NULL,
             exercice_id INTEGER NOT NULL,
-            reussi INTEGER NOT NULL,       -- 0 ou 1
+            reussi INTEGER NOT NULL,
             date TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (utilisateur_id) REFERENCES Utilisateur(id) ON DELETE CASCADE,
             FOREIGN KEY (exercice_id) REFERENCES Exercice(id) ON DELETE CASCADE
         )
     ''')
-
     c.execute('''
-        CREATE TABLE IF NOT EXISTS Erreur (
+        CREATE TABLE Erreur (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             id_resultat INTEGER NOT NULL,
             id_notion INTEGER NOT NULL,
@@ -96,7 +88,6 @@ def creer_tables():
             FOREIGN KEY (id_notion) REFERENCES Notion(id) ON DELETE CASCADE
         )
     ''')
-
     conn.commit()
     conn.close()
     print("✅ Tables créées avec succès")
@@ -104,6 +95,11 @@ def creer_tables():
 def inserer_donnees_test():
     conn = connexion_db()
     c = conn.cursor()
+    # Vérifier si les chapitres existent déjà
+    c.execute("SELECT COUNT(*) FROM Chapitre")
+    if c.fetchone()[0] > 0:
+        conn.close()
+        return
 
     chapitres = [
         ("NSI", "Algorithmes de tri", "forte"),
@@ -130,7 +126,7 @@ def inserer_donnees_test():
     print("✅ Notions insérées")
 
     exercices = [
-        # Chapitre 1 (Algorithmes de tri)
+        # Chapitre 1
         (1, "QCM", "Quel est le tri le plus rapide en moyenne ?",
          "Tri rapide;Tri bulle;Tri insertion", "0", "",
          "", "", ""),
@@ -143,7 +139,7 @@ def inserer_donnees_test():
          "", "O(n²)", "",
          "", "", ""),
 
-        # Chapitre 2 (Structures de données)
+        # Chapitre 2
         (2, "QCM", "Quelle structure utilise le principe LIFO ?",
          "Pile;File;Liste;Dictionnaire", "0", "",
          "", "", ""),
@@ -153,7 +149,7 @@ def inserer_donnees_test():
          "",
          "empiler", "([], 5)", "[5]"),
 
-        # Chapitre 3 (Bases de données SQL)
+        # Chapitre 3
         (3, "QCM", "Quelle commande SQL permet de récupérer des données ?",
          "SELECT;INSERT;UPDATE;DELETE", "0", "",
          "", "", ""),
@@ -161,7 +157,7 @@ def inserer_donnees_test():
          "", "SELECT * FROM eleves;", "",
          "", "", "SELECT * FROM eleves;"),
 
-        # Chapitre 4 (POO)
+        # Chapitre 4
         (4, "QCM", "Quel mot-clé permet de définir une classe en Python ?",
          "class;def;struct;object", "0", "",
          "", "", ""),
@@ -169,7 +165,7 @@ def inserer_donnees_test():
          "", "objet", "",
          "", "", ""),
 
-        # Chapitre 5 (Récursivité)
+        # Chapitre 5
         (5, "code", "Écris une fonction récursive `factorielle(n)` qui calcule n!.",
          "",
          "def factorielle(n):\n    if n <= 1:\n        return 1\n    else:\n        return n * factorielle(n-1)",
@@ -207,13 +203,16 @@ def inserer_donnees_test():
         (10, notion_map["Fonction récursive"]),
         (11, notion_map["Fonction récursive"]),
     ]
-
     c.executemany("INSERT INTO Exercice_Notion (exercice_id, notion_id) VALUES (?,?)", liaisons)
     print("✅ Liaisons exercice-notion insérées")
 
     conn.commit()
     conn.close()
     print("✅ Toutes les données de test ont été insérées")
+
+# --------------------------------------------------------------------
+# Fonctions CRUD
+# --------------------------------------------------------------------
 
 def ajouter_utilisateur(nom, mdp, niveau, etablissement):
     conn = connexion_db()
