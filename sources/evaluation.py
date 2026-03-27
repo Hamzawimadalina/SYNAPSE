@@ -11,11 +11,7 @@ from database import (
 from code_correction import verifier_fonction
 from remediation import afficher_remediation
 
-
 def afficher_exercice(exercice_id, utilisateur_id):
-    """
-    Affiche un exercice dans une nouvelle fenêtre et évalue la réponse.
-    """
     exo = get_exercice(exercice_id)
     if not exo:
         messagebox.showerror("Erreur", "Exercice introuvable.")
@@ -103,16 +99,20 @@ def afficher_exercice(exercice_id, utilisateur_id):
 
         elif type_exo == "code":
             try:
-                input_val = ast.literal_eval(test_input) if test_input else None
-                output_val = ast.literal_eval(test_output) if test_output else None
-                reussi, msg = verifier_fonction(
-                    nom_fonction=nom_fonction,
-                    code_saisi=reponse,
-                    test_entre=input_val,
-                    resultat_attendu=output_val,
-                    contraintes=contraintes.split(",") if contraintes else []
-                )
-                message = msg
+                if not nom_fonction:
+                    # Cas d'un simple texte (ex: requête SQL)
+                    reussi = (reponse.strip().lower() == reponse_attendue.strip().lower())
+                    message = "✅ Correct !" if reussi else f"❌ Incorrect. Attendu : {reponse_attendue}"
+                else:
+                    input_val = ast.literal_eval(test_input) if test_input else None
+                    output_val = ast.literal_eval(test_output) if test_output else None
+                    reussi, message = verifier_fonction(
+                        nom_fonction=nom_fonction,
+                        code_saisi=reponse,
+                        test_entre=input_val,
+                        resultat_attendu=output_val,
+                        contraintes=contraintes.split(",") if contraintes else []
+                    )
             except Exception as e:
                 message = f"❌ Erreur lors de l'évaluation : {e}"
                 reussi = False
