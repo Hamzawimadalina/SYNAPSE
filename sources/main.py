@@ -1,5 +1,8 @@
+from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
+import os
+
 from database import (
     creer_tables, inserer_donnees_test, ajouter_utilisateur, get_utilisateur, creer_session,
     get_chapitres, get_exercices_par_chapitre, get_progression_chapitre,
@@ -20,12 +23,11 @@ def couleur_progression(valeur):
     else: return "red"
 
 def emoji_frequence(frequence):
-    """Convertit la fréquence bac en emoji/couleur"""
     if frequence == "forte":
         return "🔴"
     elif frequence == "moyenne":
         return "🟠"
-    else:  # faible
+    else:
         return "🟢"
 
 def inscription():
@@ -62,7 +64,6 @@ def deconnexion():
 # -------------------- Liste des exercices d'un chapitre --------------------
 
 def ouvrir_chapitre(chapitre_id, chapitre_nom):
-    """Ouvre une nouvelle fenêtre listant les exercices du chapitre."""
     win = tk.Toplevel()
     win.title(f"Exercices - {chapitre_nom}")
     win.geometry("600x500")
@@ -74,23 +75,17 @@ def ouvrir_chapitre(chapitre_id, chapitre_nom):
     if not exercices:
         tk.Label(win, text="Aucun exercice pour ce chapitre.").pack(pady=20)
     else:
-        # Cadre avec scrollbar
         canvas = tk.Canvas(win)
         scrollbar = tk.Scrollbar(win, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas)
 
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
         canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
         scrollbar.pack(side="right", fill="y")
 
-        # En-tête
         tk.Label(scrollable_frame, text="Liste des exercices", font=("Arial", 10, "underline")).grid(row=0, column=0, columnspan=2, pady=5)
 
         for i, exo in enumerate(exercices):
@@ -110,7 +105,6 @@ def ouvrir_chapitre(chapitre_id, chapitre_nom):
 # -------------------- Statistiques détaillées --------------------
 
 def afficher_statistiques():
-    """Ouvre une fenêtre avec les statistiques globales et par chapitre (comparaisons classe/établissement)."""
     if not utilisateur:
         return
     stats = get_statistiques_globales(utilisateur[0])
@@ -130,23 +124,17 @@ def afficher_statistiques():
 
     tk.Label(win, text="Progression par chapitre", font=("Arial", 12, "bold")).pack(pady=10)
 
-    # Cadre avec scrollbar pour les chapitres
     canvas = tk.Canvas(win)
     scrollbar = tk.Scrollbar(win, orient="vertical", command=canvas.yview)
     scrollable_frame = tk.Frame(canvas)
 
-    scrollable_frame.bind(
-        "<Configure>",
-        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-    )
-
+    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
     canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
     canvas.configure(yscrollcommand=scrollbar.set)
 
     canvas.pack(side="left", fill="both", expand=True, padx=10)
     scrollbar.pack(side="right", fill="y")
 
-    # Récupérer la liste des chapitres avec leurs IDs
     chapitres = get_chapitres("NSI")
     nom_vers_id = {chap[1]: chap[0] for chap in chapitres}
 
@@ -175,7 +163,6 @@ def afficher_statistiques():
 # -------------------- Graphique de progression --------------------
 
 def afficher_graphique_progression():
-    """Affiche un graphique des progressions par chapitre."""
     if not utilisateur:
         return
     stats = get_statistiques_globales(utilisateur[0])
@@ -198,6 +185,64 @@ def afficher_graphique_progression():
     canvas.get_tk_widget().pack()
     tk.Button(win, text="Fermer", command=win.destroy).pack(pady=5)
 
+# -------------------- Cours et ressources --------------------
+
+def afficher_cours():
+    dossier_cours = "cours_images"
+    
+    # Créer le dossier s'il n'existe pas
+    if not os.path.exists(dossier_cours):
+        os.makedirs(dossier_cours)
+        messagebox.showinfo("Initialisation", "Le dossier 'cours_images' a été créé. Ajoutez vos images (PNG, JPG, GIF) et réessayez.")
+        return
+
+    extensions = (".png", ".jpg", ".jpeg", ".gif")
+    images = [f for f in os.listdir(dossier_cours) if f.lower().endswith(extensions)]
+    
+    if not images:
+        messagebox.showinfo("Info", "Aucune image trouvée dans 'cours_images'.")
+        return
+
+    win = tk.Toplevel()
+    win.title("Cours et ressources")
+    win.geometry("800x600")
+    
+    canvas = tk.Canvas(win)
+    scrollbar = tk.Scrollbar(win, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas)
+    
+    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Garder une référence des images pour éviter le garbage collector
+    win.image_refs = []
+
+    for img_file in images:
+        path = os.path.join(dossier_cours, img_file)
+        try:
+            img = Image.open(path)
+            # Redimensionner pour une largeur max de 700 pixels (hauteur proportionnelle)
+            ratio = 700 / img.size[0]
+            new_height = int(img.size[1] * ratio)
+            img = img.resize((700, new_height), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(img)
+            win.image_refs.append(photo)  # Stocker la référence
+
+            # Afficher l'image dans un cadre avec son nom
+            frame = tk.Frame(scrollable_frame, bd=2, relief=tk.GROOVE)
+            frame.pack(pady=10, padx=10, fill=tk.X)
+            tk.Label(frame, text=img_file, font=("Arial", 10, "bold")).pack()
+            lbl = tk.Label(frame, image=photo)
+            lbl.image = photo  # Référence supplémentaire
+            lbl.pack()
+        except Exception as e:
+            print(f"Erreur chargement {img_file} : {e}")
+    
+    tk.Button(win, text="Fermer la bibliothèque", command=win.destroy, bg="indianred", fg="white").pack(pady=10)
+
 # -------------------- Menu principal ------------------------------
 
 def menu_principal():
@@ -209,24 +254,17 @@ def menu_principal():
 
     tk.Label(root, text=f"Bienvenue {utilisateur[1]} !", font=("Arial", 14)).pack(pady=10)
 
-    # Récupérer les chapitres (NSI uniquement pour l'instant)
     chapitres = get_chapitres("NSI")
-
     if not chapitres:
         tk.Label(root, text="Aucun chapitre trouvé. Vérifiez que la base est initialisée.", fg="red").pack()
         tk.Button(root, text="Retour", command=deconnexion).pack()
         return
 
-    # Cadre pour les chapitres (avec scrollbar)
     canvas = tk.Canvas(root)
     scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
     scrollable_frame = tk.Frame(canvas)
 
-    scrollable_frame.bind(
-        "<Configure>",
-        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-    )
-
+    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
     canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
     canvas.configure(yscrollcommand=scrollbar.set)
 
@@ -235,14 +273,12 @@ def menu_principal():
 
     for chap in chapitres:
         chap_id, chap_nom, chap_freq = chap
-
         sub = tk.Frame(scrollable_frame, relief=tk.GROOVE, bd=2)
         sub.pack(fill=tk.X, padx=10, pady=5)
 
         ligne1 = tk.Frame(sub)
         ligne1.pack(fill=tk.X, padx=5, pady=2)
 
-        # Ajout de l'emoji de fréquence
         emoji = emoji_frequence(chap_freq)
         tk.Label(ligne1, text=f"{emoji} {chap_nom}", font=("Arial", 11, "bold")).pack(side=tk.LEFT)
 
@@ -254,7 +290,6 @@ def menu_principal():
         pb.pack(pady=5, padx=5)
         tk.Label(sub, text=f"{prog}% maîtrisé", fg=couleur_progression(prog)).pack()
 
-    # Boutons supplémentaires
     frame_boutons = tk.Frame(root)
     frame_boutons.pack(pady=10)
 
@@ -262,6 +297,8 @@ def menu_principal():
               command=afficher_graphique_progression, width=20).pack(side=tk.LEFT, padx=5)
     tk.Button(frame_boutons, text="Statistiques détaillées",
               command=afficher_statistiques, width=20).pack(side=tk.LEFT, padx=5)
+    tk.Button(frame_boutons, text="Cours (fiches)",
+              command=afficher_cours, width=20).pack(side=tk.LEFT, padx=5)
     tk.Button(frame_boutons, text="Déconnexion",
               command=deconnexion, width=20).pack(side=tk.LEFT, padx=5)
 
@@ -287,5 +324,5 @@ def main_window():
 
 if __name__ == "__main__":
     creer_tables()
-    inserer_donnees_test()  # Ajout pour insérer les données de test
+    inserer_donnees_test()
     main_window()
