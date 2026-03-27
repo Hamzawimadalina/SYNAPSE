@@ -1,2 +1,3 @@
+pip install Pillow
 pip install matplotlib
 matplotlib==3.6.2
